@@ -73,7 +73,7 @@ func (p *Proxy) Start(cConn *net.TCPConn) error {
 					}
 					
 					if r {
-						server, ok := config.GetConfig().servers[p.Hostname]
+						server, ok := config.GetConfig().Servers[p.Hostname]
 						if !ok {
 							return cConn.Close()
 						}
