@@ -8,12 +8,9 @@ import (
 	"slices"
 
 	"github.com/shiro8613/minecraft-a-proxy/packet"
+	"github.com/shiro8613/minecraft-a-proxy/config"
 	"golang.org/x/sync/errgroup"
 )
-
-var testMap = map[string]string{
-	"localhost": "127.0.0.1:3000",
-}
 
 type ProxyServer struct {}
 
@@ -76,7 +73,7 @@ func (p *Proxy) Start(cConn *net.TCPConn) error {
 					}
 					
 					if r {
-						server, ok := testMap[p.Hostname]
+						server, ok := config.GetConfig().servers[p.Hostname]
 						if !ok {
 							return cConn.Close()
 						}
@@ -133,7 +130,9 @@ func (p *Proxy) Start(cConn *net.TCPConn) error {
 	})
 
 	err := eg.Wait()
-	sConn.Close()
+	if sConn != nil {
+	  sConn.Close()
+	}
 
 	return err
 }
