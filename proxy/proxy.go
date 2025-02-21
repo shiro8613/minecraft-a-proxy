@@ -5,11 +5,11 @@ import (
 	"log"
 	"io"
 	"net"
-	"net/netip"
 	"slices"
 
 	"github.com/shiro8613/minecraft-a-proxy/packet"
 	"github.com/shiro8613/minecraft-a-proxy/config"
+
 	"golang.org/x/sync/errgroup"
 )
 
@@ -100,7 +100,12 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 								log.Printf("[INFO] %s is ping", addr)
 							}
 
-							serverIP := net.TCPAddrFromAddrPort(netip.MustParseAddrPort(server))
+							serverIP, err := net.ResolveTCPAddr("tcp", server)
+							if err != nil {
+								e = err
+								break
+							}
+
 							sConn, err = net.DialTCP("tcp", nil, serverIP)
 							if err != nil {
 								e = err
