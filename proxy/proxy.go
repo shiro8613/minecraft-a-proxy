@@ -2,13 +2,14 @@ package proxy
 
 import (
 	"context"
-	"log"
+	"errors"
 	"io"
+	"log"
 	"net"
 	"slices"
 
-	"github.com/shiro8613/minecraft-a-proxy/packet"
 	"github.com/shiro8613/minecraft-a-proxy/config"
+	"github.com/shiro8613/minecraft-a-proxy/packet"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -37,6 +38,9 @@ func (s *ProxyServer) Start(ctx context.Context, addr *net.TCPAddr) error {
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
 			return err
 		}
 
