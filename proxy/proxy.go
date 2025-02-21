@@ -59,8 +59,7 @@ type Proxy struct {}
 func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 	defer cConn.Close()
 
-	eg, eg_ctx := errgroup.WithContext(context.Background())
-	eg_ctx, cancel := context.WithCancel(eg_ctx)
+	var eg errgroup.Group
 
 	var sConn *net.TCPConn
 	addr := cConn.RemoteAddr()
@@ -68,12 +67,10 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 	
 	eg.Go(func() error {
 		buff := make([]byte, 0xFFFF)
-		var e error
 		for {
 			n, err := cConn.Read(buff)
 			if err != nil {
-				e = err
-				break
+				return err
 			}
 			b := buff[:n]
 			if 0 < len(b) {
@@ -83,17 +80,13 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 						p := &packet.HelloPacket{}
 						r, l, err := p.Read(b1)
 						if err != nil {
-							e = err
-							break
+							return err
 						}
 						
 						if r {
 							server, ok := config.GetConfig().Servers[p.Hostname]
 							if !ok {
-								if err := cConn.Close(); err != nil {
-									e = err
-								}
-								break
+								return cConn.Close()
 							}
 
 							if p.State == 1 {
@@ -102,14 +95,12 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 
 							serverIP, err := net.ResolveTCPAddr("tcp", server)
 							if err != nil {
-								e = err
-								break
+								return err
 							}
 
 							sConn, err = net.DialTCP("tcp", nil, serverIP)
 							if err != nil {
-								e = err
-								break
+								return err
 							}
 
 							if l != nil {
@@ -127,8 +118,7 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 						p := &packet.LoginPacket{}
 						r, err := p.Read(b1)
 						if err != nil && err != io.EOF {
-							e = err
-							break
+							return err
 						}
 
 						if r {
@@ -144,33 +134,34 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 				if sConn != nil {
 					n, err = sConn.Write(b)
 					if err != nil {
-						e = err
-						break
+						return err
 					}
 				}
 		
 			select {
-			case <- eg_ctx.Done():
+			case <- ctx.Done():
 				break
 			default:
 				continue
 			}
 		}
-		cancel()
-		return e
 	})
 	
 	eg.Go(func() error { 
 		for {
 			if sConn != nil {
-				_, err := io.Copy(cConn, sConn)		
-				if err != nil && err != io.EOF {
+				n, err := io.Copy(cConn, sConn)
+				if err != nil {
 					return err
+				}
+
+				if 0 < n {
+					return io.EOF
 				}
 			}
 
 			select {
-			case <- eg_ctx.Done():
+			case <- ctx.Done():
 				return nil
 			default:
 				continue
