@@ -79,9 +79,9 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 			if 0 < len(b) {
 				if logged != 2 { 
 					b1 := slices.Clone(b)
-					if sConn == nil {
+					if logged == 0 {
 						p := &packet.HelloPacket{}
-						r, err := p.Read(b1)
+						r, l, err := p.Read(b1)
 						if err != nil {
 							e = err
 							break
@@ -112,12 +112,18 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 								break
 							}
 
+							if l != nil {
+								log.Printf("[INFO] player is connected [%s]%s(%s)", addr.String(), l.Name, l.Uuid)
+								logged = 2
+								goto NEXT	
+							}
+
 							logged = 1
 							goto NEXT
 						}
 					}
 
-					if sConn != nil && logged == 1 {
+					if logged == 1 {
 						p := &packet.LoginPacket{}
 						r, err := p.Read(b1)
 						if err != nil && err != io.EOF {
@@ -125,7 +131,7 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 							break
 						}
 
-						if r && 3 < p.Length {
+						if r {
 							log.Printf("[INFO] player is connected [%s]%s(%s)", addr.String(), p.Name, p.Uuid)
 							logged = 2
 							goto NEXT

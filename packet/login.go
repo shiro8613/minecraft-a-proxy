@@ -1,6 +1,8 @@
 package packet
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type LoginPacket struct {
 	Name string
