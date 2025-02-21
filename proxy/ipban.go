@@ -80,6 +80,7 @@ func read(path string) error {
 
 	scanner := bufio.NewScanner(fp)
 	mu.Lock()
+	internal_blocked_ips = make([]string, 0)
 	for scanner.Scan() {
 		internal_blocked_ips = append(internal_blocked_ips, scanner.Text())
 	}
