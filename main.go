@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/netip"
+	"os"
+	"os/signal"
 
 	"github.com/shiro8613/minecraft-a-proxy/config"
 	"github.com/shiro8613/minecraft-a-proxy/proxy"
@@ -19,6 +22,10 @@ func init() {
 
 func main() {
 	conf := config.GetConfig()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	server := proxy.NewServer()
 	log.Printf("server is running on %s", conf.Bind)
 	log.Println("server mappings")
@@ -26,7 +33,7 @@ func main() {
 		log.Printf(" - %s -> %s", k, v)
 	}
 	log.Println("server started")
-	if err := server.Start(net.TCPAddrFromAddrPort(netip.MustParseAddrPort(conf.Bind))); err != nil {
+	if err := server.Start(ctx, net.TCPAddrFromAddrPort(netip.MustParseAddrPort(conf.Bind))); err != nil {
 		log.Fatalln(err)
 	}
 }
