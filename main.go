@@ -30,7 +30,7 @@ func main() {
 	defer stop()
 
 	server := proxy.NewServer()
-	log.Printf("[INFO] server is running on %s", conf.Bind)
+	log.Printf("[INFO] server is running on %s\n", conf.Bind)
 	log.Println("[INFO] server mappings")
 	for k, v := range conf.Servers {
 		log.Printf(" - %s -> %s", k, v)

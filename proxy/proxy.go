@@ -31,7 +31,7 @@ func (s *ProxyServer) Start(ctx context.Context, addr *net.TCPAddr) error {
 	go func () {
 		<- ctx.Done()
 		if err := l.Close(); err != nil {
-			log.Fatalln(err)
+			log.Fatalf("[ERROR] %s\n", err)
 		}
 	}()
 
@@ -54,7 +54,7 @@ func (s *ProxyServer) handler(ctx context.Context, c *net.TCPConn) {
 	p := &Proxy{}
 	err := p.Start(ctx, c)
 	if err != nil && err != io.EOF {
-		log.Printf("[error] %s\n", err)
+		log.Printf("[ERROR] %s\n", err)
 	}
 }
 
@@ -94,7 +94,7 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 							}
 
 							if p.State == 1 {
-								log.Printf("[INFO] %s is ping", addr)
+								log.Printf("[INFO] %s is ping\n", addr)
 							}
 
 							serverIP, err := net.ResolveTCPAddr("tcp", server)
@@ -108,7 +108,7 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 							}
 
 							if l != nil {
-								log.Printf("[INFO] player is connected [%s]%s(%s)", addr.String(), l.Name, l.Uuid)
+								log.Printf("[INFO] player is connected %s <- [%s]%s(%s)\n", server, addr.String(), l.Name, l.Uuid)
 								logged = 2
 								goto NEXT	
 							}
@@ -126,7 +126,7 @@ func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 						}
 
 						if r {
-							log.Printf("[INFO] player is connected [%s]%s(%s)", addr.String(), p.Name, p.Uuid)
+							log.Printf("[INFO] player is connected (parse failed) <- [%s]%s(%s)\n", addr.String(), p.Name, p.Uuid)
 							logged = 2
 							goto NEXT
 						}
