@@ -31,7 +31,7 @@ func (s *ProxyServer) Start(ctx context.Context, addr *net.TCPAddr) error {
 	go func () {
 		<- ctx.Done()
 		if err := l.Close(); err != nil {
-			log.Fatalf("[ERROR] %s\n", err)
+			log.Fatalln("[ERROR] ", err)
 		}
 	}()
 
@@ -51,10 +51,21 @@ func (s *ProxyServer) Start(ctx context.Context, addr *net.TCPAddr) error {
 func (s *ProxyServer) handler(ctx context.Context, c *net.TCPConn) {
 	defer c.Close()
 
+	addr := c.RemoteAddr().String()
+	ip, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		log.Println("[ERROR] ", err)
+	}
+
+	if HasBannedIps(ip) {
+		c.Close()
+		log.Printf("[INFO] banned-ip %s blocked\n", ip)
+	}
+
 	p := &Proxy{}
-	err := p.Start(ctx, c)
+	err = p.Start(ctx, c)
 	if err != nil && err != io.EOF {
-		log.Printf("[ERROR] %s\n", err)
+		log.Println("[ERROR] ", err)
 	}
 }
 

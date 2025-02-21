@@ -8,6 +8,8 @@ require (
 )
 
 require (
+	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 )

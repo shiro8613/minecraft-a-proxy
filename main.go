@@ -15,7 +15,7 @@ const CONFIG_PATH = "./config.yml"
 
 func init() {
 	if err := config.Load(CONFIG_PATH); err != nil {
-		log.Fatalln(err)
+		log.Fatalln("[ERROR] ", err)
 	}
 }
 
@@ -28,6 +28,8 @@ func main() {
 		log.Println("[INFO] shutdown...")
 	}()
 	defer stop()
+
+	proxy.StartWatching(ctx)
 
 	server := proxy.NewServer()
 	log.Printf("[INFO] server is running on %s\n", conf.Bind)
