@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"log"
 	"io"
 	"net"
@@ -18,7 +19,7 @@ func NewServer() *ProxyServer {
 	return &ProxyServer{}
 }
 
-func (s *ProxyServer) Start(addr *net.TCPAddr) error {
+func (s *ProxyServer) Start(ctx context.Context, addr *net.TCPAddr) error {
 	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return err
@@ -26,21 +27,28 @@ func (s *ProxyServer) Start(addr *net.TCPAddr) error {
 
 	defer l.Close()
 
+	go func () {
+		<- ctx.Done()
+		if err := l.Close(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
 			return err
 		}
 
-		go s.handler(conn)
+		go s.handler(ctx, conn)
 	}
 }
 
-func (s *ProxyServer) handler(c *net.TCPConn) {
+func (s *ProxyServer) handler(ctx context.Context, c *net.TCPConn) {
 	defer c.Close()
 
 	p := &Proxy{}
-	err := p.Start(c)
+	err := p.Start(ctx, c)
 	if err != nil && err != io.EOF {
 		log.Printf("[error] %s\n", err)
 	}
@@ -48,83 +56,113 @@ func (s *ProxyServer) handler(c *net.TCPConn) {
 
 type Proxy struct {}
 
-func (p *Proxy) Start(cConn *net.TCPConn) error {
+func (p *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 	defer cConn.Close()
 
-	var eg errgroup.Group
+	eg, eg_ctx := errgroup.WithContext(context.Background())
+	eg_ctx, cancel := context.WithCancel(eg_ctx)
+
 	var sConn *net.TCPConn
 	addr := cConn.RemoteAddr()
+	logged := 0
 	
 	eg.Go(func() error {
 		buff := make([]byte, 0xFFFF)
+		var e error
 		for {
 			n, err := cConn.Read(buff)
 			if err != nil {
-				return err
+				e = err
+				break
 			}
 			b := buff[:n]
 			if 0 < len(b) {
-				if sConn == nil {
+				if logged != 2 { 
 					b1 := slices.Clone(b)
-					p := &packet.HelloPacket{}
-					r, err := p.Read(b1)
-					if err != nil {
-						return err
-					}
-					
-					if r {
-						server, ok := config.GetConfig().Servers[p.Hostname]
-						if !ok {
-							return cConn.Close()
-						}
-
-						serverIP := net.TCPAddrFromAddrPort(netip.MustParseAddrPort(server))
-						sConn, err = net.DialTCP("tcp", nil, serverIP)
+					if sConn == nil {
+						p := &packet.HelloPacket{}
+						r, err := p.Read(b1)
 						if err != nil {
-							return err
+							e = err
+							break
+						}
+						
+						if r {
+							server, ok := config.GetConfig().Servers[p.Hostname]
+							if !ok {
+								if err := cConn.Close(); err != nil {
+									e = err
+								}
+								break
+							}
+
+							if p.State == 1 {
+								log.Printf("[INFO] %s is ping", addr)
+							}
+
+							serverIP := net.TCPAddrFromAddrPort(netip.MustParseAddrPort(server))
+							sConn, err = net.DialTCP("tcp", nil, serverIP)
+							if err != nil {
+								e = err
+								break
+							}
+
+							logged = 1
+							goto NEXT
 						}
 					}
-				}
 
-				if sConn != nil && addr != nil {
-					b1 := slices.Clone(b)
-					p := &packet.LoginPacket{}
-					r, err := p.Read(b1)
-					if err != nil && err != io.EOF {
-						return err
-					}
+					if sConn != nil && logged == 1 {
+						p := &packet.LoginPacket{}
+						r, err := p.Read(b1)
+						if err != nil && err != io.EOF {
+							e = err
+							break
+						}
 
-					if r && 3 < p.Length {
-						log.Printf("player is connected [%s]%s(%s)", addr.String(), p.Name, p.Uuid)
-						addr = nil
+						if r && 3 < p.Length {
+							log.Printf("[INFO] player is connected [%s]%s(%s)", addr.String(), p.Name, p.Uuid)
+							logged = 2
+							goto NEXT
+						}
 					}
 				}
 			}
 
-			if sConn != nil {
-				n, err = sConn.Write(b)
-				if err != nil {
-					return err
+			NEXT:
+				if sConn != nil {
+					n, err = sConn.Write(b)
+					if err != nil {
+						e = err
+						break
+					}
 				}
+		
+			select {
+			case <- eg_ctx.Done():
+				break
+			default:
+				continue
 			}
 		}
+		cancel()
+		return e
 	})
 	
 	eg.Go(func() error { 
-		buff := make([]byte, 0xFFFF)
 		for {
 			if sConn != nil {
-				n,err := sConn.Read(buff)
-				if err != nil {
+				_, err := io.Copy(cConn, sConn)		
+				if err != nil && err != io.EOF {
 					return err
 				}
-	
-				b := buff[:n]
-	
-				n, err = cConn.Write(b)
-				if err != nil {
-					return err
-				}
+			}
+
+			select {
+			case <- eg_ctx.Done():
+				return nil
+			default:
+				continue
 			}
 		}
 	})
