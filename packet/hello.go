@@ -1,8 +1,6 @@
 package packet
 
-import (
-	"encoding/binary"
-)
+import "encoding/binary"
 
 type HelloPacket struct {
 	ProtocolVersion int32
