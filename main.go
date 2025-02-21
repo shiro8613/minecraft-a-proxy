@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net"
-	"net/netip"
 	"os"
 	"os/signal"
 
@@ -31,13 +30,17 @@ func main() {
 	defer stop()
 
 	server := proxy.NewServer()
-	log.Printf("server is running on %s", conf.Bind)
-	log.Println("server mappings")
+	log.Printf("[INFO] server is running on %s", conf.Bind)
+	log.Println("[INFO] server mappings")
 	for k, v := range conf.Servers {
 		log.Printf(" - %s -> %s", k, v)
 	}
-	log.Println("server started")
-	if err := server.Start(ctx, net.TCPAddrFromAddrPort(netip.MustParseAddrPort(conf.Bind))); err != nil {
+	bindHost, err := net.ResolveTCPAddr("tcp", conf.Bind)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("[INFO] server started")
+	if err := server.Start(ctx, bindHost); err != nil {
 		log.Fatalln(err)
 	}
 }
