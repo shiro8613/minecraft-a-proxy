@@ -19,6 +19,9 @@ func (p *LoginPacket) Read(b []byte) (bool, error) {
 	}
 
 	name_len, err := p.readVarint(r)
+	if !(1 <= name_len && name_len >= 51) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -32,7 +35,7 @@ func (p *LoginPacket) Read(b []byte) (bool, error) {
 
 	buf = make([]byte, 16)
 	n, err = r.Read(buf)
-	if err != nil  {
+	if err != nil {
 		return false, err
 	}
 	uid, err := uuid.FromBytes(buf)
