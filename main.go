@@ -24,6 +24,10 @@ func main() {
 	conf := config.GetConfig()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	go func() {
+		<- ctx.Done()
+		log.Println("[INFO] shutdown...")
+	}()
 	defer stop()
 
 	server := proxy.NewServer()
