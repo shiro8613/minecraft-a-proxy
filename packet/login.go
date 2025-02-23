@@ -30,8 +30,8 @@ func (p *LoginPacket) Read(b []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	p.Name = string(buf[:n])
+	buf = nil
 
 	buf = make([]byte, 16)
 	n, err = r.Read(buf)
@@ -42,6 +42,7 @@ func (p *LoginPacket) Read(b []byte) (bool, error) {
 	if err != nil {
 		return false, nil
 	}
+	buf = nil
 	p.Uuid = uid.String()
 
 	return true, nil

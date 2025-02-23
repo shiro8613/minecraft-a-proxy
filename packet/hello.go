@@ -39,6 +39,7 @@ func (p *HelloPacket) Read(b []byte) (bool, *LoginPacket, error) {
 		return false, nil, err
 	}
 	p.Hostname = string(buf[:n1])
+	buf = nil
 
 	buf = make([]byte, 2)
 	_, err = r.Read(buf)
@@ -46,6 +47,7 @@ func (p *HelloPacket) Read(b []byte) (bool, *LoginPacket, error) {
 		return false, nil, err
 	}
 	p.Port = int16(binary.BigEndian.Uint16(buf))
+	buf = nil
 
 	n, err = p.readVarint(r)
 	if err != nil {
@@ -61,6 +63,7 @@ func (p *HelloPacket) Read(b []byte) (bool, *LoginPacket, error) {
 	if 0 < len(bb) {
 		l := &LoginPacket{}
 		ok, err := l.Read(bb)
+		bb = nil
 		if err != nil {
 			return false, nil, err
 		}
@@ -69,6 +72,8 @@ func (p *HelloPacket) Read(b []byte) (bool, *LoginPacket, error) {
 			return true, l, nil
 		}
 	}
+
+	bb = nil
 
 	return true, nil, nil
 }
