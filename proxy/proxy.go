@@ -9,9 +9,8 @@ import (
 	"slices"
 
 	"github.com/shiro8613/minecraft-a-proxy/config"
+	"github.com/shiro8613/minecraft-a-proxy/eg"
 	"github.com/shiro8613/minecraft-a-proxy/packet"
-
-	"golang.org/x/sync/errgroup"
 )
 
 type ProxyServer struct {}
@@ -91,15 +90,13 @@ type Proxy struct {}
 func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 	defer cConn.Close()
 
-	var eg errgroup.Group
+	group := eg.New()
 
 	var sConn *net.TCPConn
 	closed, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	eg.Go(func() error {
-		defer cancel()
-
+	group.Go(func() error {
 		addr := cConn.RemoteAddr()
 		logged := 0	
 		buff := make([]byte, 0xFFFF)
@@ -165,22 +162,16 @@ func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 							if l != nil {
 								log.Printf("[INFO] player is connected %s <- [%s]%s(%s)\n", server, addr.String(), l.Name, l.Uuid)
 								b1 = nil
-								p = nil
 								l = nil
 								logged = 2
 								goto NEXT	
 							}
 
 							logged = 1
+							p = nil
 							b1 = nil
 
 							goto NEXT
-						} else if sConn == nil && !r {
-							b = nil
-							b1 = nil
-							l = nil
-							p = nil
-							return io.EOF
 						}
 					}
 
@@ -197,11 +188,12 @@ func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 
 						if r {
 							log.Printf("[INFO] player is connected (parse failed) <- [%s]%s(%s)\n", addr.String(), p.Name, p.Uuid)
-							b1 = nil
-							p = nil
 							logged = 2
 							goto NEXT
 						}
+
+						b1 = nil
+						p = nil
 					}
 				} else if logged == 2 {
 					addr = nil
@@ -217,42 +209,47 @@ func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 						b = nil
 						return err
 					}
+				} else {
+					return io.EOF
 				}
 		
 			b = nil
 
 			select {
 			case <- closed.Done():
+				buff = nil
 				return nil
 			default:
 			}
 		}
 	})
 	
-	eg.Go(func() error {
+	group.Go(func() error {
+		b := make([]byte, 0xFFFF)
 		for {
 			if sConn != nil {
-				n, err := io.Copy(cConn, sConn)
+				n, err := io.CopyBuffer(cConn, sConn, b)
 				if err != nil {
+					b = nil
 					return err
 				}
 
 				if n < 0 {
+					b = nil
 					return io.EOF
 				}
 			}
 
 			select {
 			case <- closed.Done():
+				b = nil
 				return nil
 			default:
 			}
 		}
-
-
 	})
 
-	err := eg.Wait()
+	err := group.Wait()
 	cConn.Close()
 	cConn = nil
 	if sConn != nil {
