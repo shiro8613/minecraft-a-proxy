@@ -10,5 +10,5 @@ FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=build /app/main .
+COPY --from=build /app/main ./
 ENTRYPOINT ["./main"]
