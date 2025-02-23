@@ -89,11 +89,11 @@ type Proxy struct {}
 
 func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 	defer cConn.Close()
-
 	group := eg.New()
 
 	var sConn *net.TCPConn
 	closed, cancel := context.WithCancel(ctx)
+	connected := make(chan struct{})
 	defer cancel()
 
 	group.Go(func() error {
@@ -143,6 +143,7 @@ func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 							}
 
 							sConn, err = net.DialTCP("tcp", nil, serverIP)
+							close(connected)
 							if err != nil {
 								p = nil
 								b1 = nil
@@ -203,11 +204,14 @@ func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 
 			NEXT:
 				if sConn != nil {
-					_, err = sConn.Write(b)
+					n, err = sConn.Write(b)
 					if err != nil {
 						buff = nil
 						b = nil
 						return err
+					}
+					if n < 0 {
+						return io.EOF
 					}
 				} else {
 					return io.EOF
@@ -226,6 +230,7 @@ func (pr *Proxy) Start(ctx context.Context, cConn *net.TCPConn) error {
 	
 	group.Go(func() error {
 		b := make([]byte, 0xFFFF)
+		<- connected
 		for {
 			if sConn != nil {
 				n, err := io.CopyBuffer(cConn, sConn, b)
